@@ -1,0 +1,1647 @@
+<!DOCTYPE html>
+<html lang="bn-IN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#fef08a">
+<title id="docTitle">Public Cab — Premium Ride & Parcel Delivery</title>
+
+<!-- PWA Standard Meta Tags -->
+<link rel="manifest" id="manifestPlaceholder">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+
+<!-- External Libraries (Tailwind CSS, FontAwesome 6, Leaflet Maps) -->
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<!-- Firebase SDKs (Compat Version 9.23.0) -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body,html{margin:0;padding:0;background:#fef08a;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:#1e3a8a;overscroll-behavior-y:none}
+#app{max-width:480px;min-height:100vh;margin:0 auto;background:#fef08a;position:relative;overflow-x:hidden;box-shadow:0 0 50px rgba(0,0,0,0.15)}
+
+/* Map Layout Styling */
+#mapContainer{display:none;transition:all 0.3s ease}
+#mapContainer.show{display:block}
+#map{height:220px;width:100%;border-radius:18px;position:relative;z-index:1;border:2px solid #2563eb;box-shadow:0 4px 20px rgba(37,99,235,0.2)}
+
+.hidden{display:none!important}
+.card{background:#ffffff;border:1.5px solid #2563eb;border-radius:20px;padding:14px;box-shadow:0 4px 15px rgba(37,99,235,0.15);color:#1e3a8a}
+.field{width:100%;padding:11px 14px;border:1.5px solid #2563eb;border-radius:12px;background:#fefce8;outline:none;font-size:13px;font-weight:700;color:#1e3a8a;transition:all 0.2s}
+.field:focus{border-color:#1d4ed8;box-shadow:0 0 0 3px rgba(37,99,235,0.25);background:#ffffff}
+
+.btn{border:0;border-radius:12px;padding:11px 16px;font-weight:800;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px;transition:all 0.15s ease}
+.btn:active{transform:scale(0.97)}
+.btn-blue{background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#ffffff;box-shadow:0 4px 14px rgba(37,99,235,0.4)}
+.btn-yellow{background:linear-gradient(135deg,#facc15,#eab308);color:#1e3a8a;box-shadow:0 4px 14px rgba(234,179,8,0.4)}
+.btn-green{background:#10b981;color:#ffffff}
+.btn-red{background:#ef4444;color:#ffffff}
+
+/* Category Grid */
+.cat-card{border:1.5px solid #2563eb;border-radius:14px;padding:8px 4px;text-align:center;background:#ffffff;cursor:pointer;transition:all 0.2s;color:#1e3a8a}
+.cat-card.active{background:#2563eb;border-color:#1d4ed8;color:#ffffff;transform:scale(1.02);box-shadow:0 4px 12px rgba(37,99,235,0.3)}
+.cat-card.active .text-slate-600{color:#e0e7ff!important}
+.vehicle-photo{height:46px;width:100%;object-fit:contain;border-radius:8px;margin-bottom:4px}
+
+.modal{position:fixed;inset:0;background:rgba(30,58,138,0.85);backdrop-filter:blur(6px);z-index:9999;display:flex;align-items:flex-end;justify-content:center}
+.modal-inner{width:100%;max-width:480px;max-height:92vh;overflow-y:auto;background:#fefce8;border-radius:24px 24px 0 0;padding:20px;box-shadow:0 -10px 40px rgba(0,0,0,0.4);border-top:3px solid #2563eb;color:#1e3a8a}
+
+.autocomplete-box{position:absolute;z-index:50;width:100%;max-height:180px;overflow-y:auto;background:#ffffff;border:1.5px solid #2563eb;border-radius:12px;box-shadow:0 10px 25px rgba(0,0,0,0.2)}
+.autocomplete-item{padding:10px 12px;font-size:12px;font-weight:700;cursor:pointer;border-bottom:1px solid #e0e7ff;color:#1e3a8a}
+.autocomplete-item:hover{background:#2563eb;color:#ffffff}
+
+#parcelFields{display:none}
+#parcelFields.show{display:grid}
+
+/* Chat Modal */
+#chatModal{z-index:10000}
+.chat-bubble-cust{background:#2563eb;color:#fff;border-radius:14px 14px 2px 14px;padding:8px 12px;max-width:80%;margin-left:auto;font-size:12px}
+.chat-bubble-other{background:#e2e8f0;color:#1e3a8a;border-radius:14px 14px 14px 2px;padding:8px 12px;max-width:80%;margin-right:auto;font-size:12px}
+
+.chat-widget-btn{position:fixed;bottom:75px;right:15px;z-index:99;background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff;width:50px;height:50px;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 20px rgba(37,99,235,0.5);cursor:pointer}
+
+/* Bottom Nav */
+.bottom-nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;background:#ffffff;color:#1e3a8a;display:flex;justify-space-around;padding:10px 0;z-index:40;border-top-left-radius:20px;border-top-right-radius:20px;border-top:2px solid #2563eb;box-shadow:0 -4px 15px rgba(37,99,235,0.15)}
+.nav-item{display:flex;flex-direction:column;align-items:center;font-size:10px;font-weight:800;cursor:pointer;color:#64748b}
+.nav-item.active{color:#2563eb}
+.nav-item i{font-size:18px;margin-bottom:2px}
+
+/* Page Lock */
+#customerView.booking-locked #customerBookingForm,
+#customerView.booking-locked #categoryBookingCard,
+#customerView.booking-locked #customerInstallControls,
+#customerView.booking-locked #customerHistoryPanel,
+#customerView.booking-locked #customerNearbyStoresSection{display:none!important}
+#customerView.booking-locked #mapContainer,
+#customerView.booking-locked #customerRideCard{display:block!important}
+</style>
+</head>
+<body>
+<div id="app" class="pb-20">
+
+  <!-- Splash Screen -->
+  <div id="splash" class="fixed inset-0 z-[99999] flex flex-col items-center justify-center bg-yellow-300 text-blue-900 transition-opacity duration-700">
+    <div class="w-24 h-24 rounded-3xl border-2 border-blue-600 bg-white p-2 mb-4 flex items-center justify-center shadow-2xl animate-bounce">
+      <img id="splashLogo" class="w-full h-full object-cover rounded-2xl" src="https://cdn-icons-png.flaticon.com/512/727/727245.png" alt="Logo">
+    </div>
+    <h1 id="splashTitle" class="text-3xl font-black tracking-tight text-blue-900 drop-shadow">Public Cab</h1>
+    <p class="text-xs font-bold mt-2 bg-blue-600 text-white px-4 py-1.5 rounded-full shadow border border-blue-300">Ride & Parcel Express Service</p>
+  </div>
+
+  <!-- Header Section -->
+  <header class="bg-yellow-300 px-4 pt-4 pb-6 rounded-b-[28px] shadow-xl relative z-30 border-b-2 border-blue-600 text-blue-900">
+    <div class="flex justify-between items-center mb-3">
+      <div class="flex items-center gap-2.5 cursor-pointer" onclick="handleLogoTap()">
+        <img id="headerLogo" class="w-10 h-10 rounded-full border-2 border-blue-600 object-cover bg-white shadow" src="https://cdn-icons-png.flaticon.com/512/727/727245.png" alt="Logo">
+        <div>
+          <span class="text-[10px] text-blue-800 font-extrabold block uppercase leading-none">স্বাগতম — Welcome</span>
+          <div id="headerBrand" class="font-black text-xl text-blue-900 drop-shadow leading-tight">Public Cab</div>
+        </div>
+      </div>
+      
+      <!-- Customer / Partner Switcher -->
+      <div class="flex bg-white p-1 rounded-full text-xs font-extrabold border border-blue-600">
+        <button id="tabCust" class="px-3 py-1 rounded-full bg-blue-600 text-white shadow" onclick="switchTab('customer')">Customer / কাস্টমার</button>
+        <button id="tabDrv" class="px-3 py-1 rounded-full text-blue-900" onclick="switchTab('driver')">Partner / ড্রাইভার</button>
+      </div>
+    </div>
+
+    <!-- Multiple Banner Carousel Bar -->
+    <div id="bannerCarouselBox" class="mb-3 rounded-xl overflow-hidden bg-white p-1.5 border border-blue-600 shadow-inner">
+      <div id="bannerContainer" class="flex transition-transform duration-500">
+        <div class="min-w-full px-2 py-1 text-center text-xs font-black text-blue-900">🚖 Welcome to Public Cab — দ্রুত এবং নিরাপদ রাইড ও পার্সেল ডেলিভারি! Fast & Secure Ride & Parcel Express</div>
+      </div>
+    </div>
+
+    <!-- Search Location Input Cards with GPS Button -->
+    <div class="bg-white p-3 rounded-2xl shadow-xl border-2 border-blue-600 space-y-2">
+      <div class="relative flex items-center">
+        <div class="absolute left-3 text-blue-600"><i class="fa-solid fa-circle-dot"></i></div>
+        <input id="inputManualPickup" class="field pl-9 pr-10" placeholder="Pickup Location (GPS বা ঠিকানা লিখুন)" oninput="handleAddressAutoSearch('inputManualPickup')">
+        <button type="button" onclick="getCurrentGpsLocation()" class="absolute right-2.5 text-blue-600 hover:text-blue-800 p-1.5 bg-yellow-100 rounded-lg border border-blue-400" title="Get Current GPS Location">
+          <i class="fa-solid fa-crosshairs text-sm"></i>
+        </button>
+        <div id="inputManualPickupSuggestions" class="autocomplete-box hidden"></div>
+      </div>
+      <div class="relative">
+        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-blue-600"><i class="fa-solid fa-location-dot"></i></div>
+        <input id="inputManualDrop" class="field pl-9" placeholder="Drop Location (গন্তব্যের ঠিকানা খুঁজুন)" oninput="handleAddressAutoSearch('inputManualDrop')">
+        <div id="inputManualDropSuggestions" class="autocomplete-box hidden"></div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Realtime Announcement Ticker -->
+  <div class="bg-yellow-400 text-blue-900 text-[11px] font-black py-1.5 px-3 overflow-hidden whitespace-nowrap flex items-center border-b border-blue-600">
+    <i class="fa-solid fa-bullhorn mr-2 text-blue-700"></i>
+    <marquee scrollamount="5"><span id="marqueeText">Public Cab — 24/7 Fast Cab & Parcel Delivery • ২৪/৭ দ্রুত ক্যাব ও পার্সেল সার্ভিস • Helpline: 9609546435</span></marquee>
+  </div>
+
+  <main class="p-3.5 space-y-3.5">
+
+    <!-- ================= CUSTOMER VIEW ================= -->
+    <section id="customerView" class="space-y-3.5">
+
+      <!-- Customer Auth Card -->
+      <div id="customerAuthCard" class="card space-y-3">
+        <h3 class="font-black text-sm text-blue-900 flex items-center gap-2"><i class="fa-solid fa-user-lock text-blue-600"></i> Customer Login & Registration (কাস্টমার লগইন)</h3>
+        <input id="custAuthPhone" class="field" type="tel" placeholder="Mobile Number (মোবাইল নম্বর)">
+        <input id="custAuthName" class="field" placeholder="Full Name (পূর্ণ নাম)">
+        <button class="btn btn-blue w-full text-xs py-3" onclick="loginOrRegisterCustomer()"><i class="fa-solid fa-right-to-bracket"></i> Login / Register & Continue (লগইন করুন)</button>
+      </div>
+
+      <!-- Main Customer App Dashboard -->
+      <div id="customerMainDashboard" class="hidden space-y-3.5">
+
+        <!-- Dynamic Route Map Preview -->
+        <div id="mapContainer" class="card space-y-2">
+          <div class="flex justify-between items-center">
+            <b class="text-xs font-black text-blue-900"><i class="fa-solid fa-map-location-dot mr-1"></i> Live GPS Route & ETA (লাইভ জিপিএস রুট)</b>
+            <button class="btn btn-blue text-[10px] py-1 px-2.5" onclick="getCurrentGpsLocation()"><i class="fa-solid fa-crosshairs text-yellow-300"></i> Auto GPS</button>
+          </div>
+          <div id="map"></div>
+        </div>
+
+        <!-- Active Ride Monitor Box -->
+        <div id="customerRideCard" class="card hidden space-y-3 bg-white border-2 border-blue-600">
+          <div id="customerSearchState" class="text-center py-4 space-y-2">
+            <div class="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
+            <h3 class="font-black text-blue-900 text-base">Searching Driver... (ড্রাইভার খোঁজা হচ্ছে...)</h3>
+            <p class="text-xs font-bold text-slate-600">Waiting for driver accept. (ড্রাইভার গ্রহণ করার পর কাস্টমার বুকিং কাটতে পারবে না)</p>
+          </div>
+
+          <div id="customerMatchedState" class="hidden space-y-3">
+            <div class="flex items-center justify-between border-b border-blue-200 pb-2.5">
+              <div>
+                <span class="text-[10px] font-black uppercase text-emerald-600">Driver Confirmed (ড্রাইভার কনফার্মড)</span>
+                <h4 id="custDriverName" class="font-black text-base text-blue-900">Driver Name</h4>
+                <p id="custVehicleDetails" class="text-xs font-bold text-slate-600">Vehicle Details</p>
+              </div>
+              <div class="flex gap-1.5">
+                <a id="custCallBtn" href="#" class="btn btn-green text-xs"><i class="fa-solid fa-phone"></i> Call (কল)</a>
+                <button class="btn btn-blue text-xs" onclick="openLiveChatWindow()"><i class="fa-solid fa-comments"></i> Chat (চ্যাট)</button>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2 bg-yellow-50 p-3 rounded-2xl border border-blue-300 text-xs text-blue-900 font-bold">
+              <div><span>Ride OTP (ওটিপি):</span> <b id="custRideOtp" class="text-blue-600 text-lg block font-black">----</b></div>
+              <div><span>Total Fare (মোট ভাড়া):</span> <b id="custRideFare" class="text-blue-900 text-lg block font-black">₹0</b></div>
+              <div class="col-span-2 border-t border-blue-200 pt-2 mt-1">
+                <span><i class="fa-solid fa-clock mr-1"></i> Live Distance & ETA (দূরত্ব ও সময়):</span>
+                <p id="custEtaText" class="font-black text-xs text-emerald-600 mt-0.5">Calculating...</p>
+              </div>
+            </div>
+          </div>
+          <button id="btnCancelCustomerBooking" class="btn btn-red w-full text-xs py-2.5" onclick="cancelCustomerBooking()"><i class="fa-solid fa-xmark"></i> Cancel Booking (বুকিং বাতিল করুন)</button>
+        </div>
+
+        <!-- Nearby Stores / Shops Section for Customers -->
+        <div id="customerNearbyStoresSection" class="card space-y-3 bg-white border-2 border-blue-600">
+          <div class="flex justify-between items-center">
+            <b class="text-sm font-black text-blue-900"><i class="fa-solid fa-store text-blue-600 mr-1"></i> Nearby Stores & Shops (নিয়ারবাই দোকান)</b>
+            <button class="btn btn-blue text-[10px] py-1" onclick="openStoreRegistrationModal()"><i class="fa-solid fa-plus"></i> List Your Store (দোকান লিস্টিং)</button>
+          </div>
+          <p class="text-[11px] font-bold text-slate-600">আপনার কারেন্ট লোকেশনের আশপাশের দোকানগুলি সরাসরি কল করে যোগাযোগ করুন</p>
+          <div id="nearbyStoresContainer" class="space-y-2"></div>
+        </div>
+
+        <!-- Vehicle & Parcel Category Selection Grid -->
+        <div id="categoryBookingCard" class="card space-y-3">
+          <div class="flex justify-between items-center">
+            <b class="text-sm font-black text-blue-900">Select Vehicle / Parcel (গাড়ি বা পার্সেল বাছুন)</b>
+            <span class="text-xs font-extrabold text-blue-600">Auto Pricing</span>
+          </div>
+          <div id="categoryGrid" class="grid grid-cols-3 gap-2"></div>
+        </div>
+
+        <!-- User & Parcel Booking Details Input Form -->
+        <div id="customerBookingForm" class="card space-y-3">
+          <div id="parcelFields" class="grid grid-cols-2 gap-2 bg-yellow-50 border border-blue-400 rounded-2xl p-3">
+            <b class="col-span-2 text-xs text-blue-900 flex items-center gap-1"><i class="fa-solid fa-box font-bold"></i> Parcel Details (পার্সেল তথ্য ও সাইজ/পরিমাণ)</b>
+            <input id="parcelDescription" class="field col-span-2" placeholder="Item Name & Quantity (যেমন: 5kg মিষ্টি, 2 Ltr milk, 1 Packet)">
+            <input id="parcelWeight" class="field" placeholder="Size/Weight/Unit (যেমন: 5 KG, 2 Ltr)">
+            <input id="parcelPickupName" class="field" placeholder="Sender Name (প্রেরকের নাম)">
+            <input id="parcelPickupPhone" class="field" type="tel" placeholder="Sender Phone (প্রেরকের ফোন)">
+            <input id="parcelReceiverName" class="field" placeholder="Receiver Name (গ্রাহকের নাম)">
+            <input id="parcelReceiverPhone" class="field" type="tel" placeholder="Receiver Phone (গ্রাহকের ফোন)">
+          </div>
+
+          <div class="flex justify-between items-center bg-yellow-50 p-3 rounded-2xl border border-blue-300">
+            <div>
+              <p class="text-[10px] text-blue-800 font-extrabold uppercase">Estimated Distance (দূরত্ব)</p>
+              <b id="displayDistance" class="text-base text-blue-900 font-black">0.0 km</b>
+            </div>
+            <div class="text-right">
+              <p class="text-[10px] text-blue-800 font-extrabold uppercase">Calculated Fare (ভাড়া)</p>
+              <b id="displayFare" class="text-xl text-blue-600 font-black">₹0</b>
+            </div>
+          </div>
+
+          <button id="btnConfirmBooking" class="btn btn-blue w-full py-3.5 text-sm" onclick="submitBooking()"><i class="fa-solid fa-circle-check"></i> CONFIRM BOOKING (বুকিং কনফার্ম করুন)</button>
+        </div>
+
+        <!-- Web App PWA Installation & Direct Application Link Share -->
+        <div id="customerInstallControls" class="grid grid-cols-2 gap-2">
+          <button class="card text-xs font-black text-center py-3 flex items-center justify-center gap-2 text-blue-900 bg-white border-2 border-blue-600" onclick="triggerPwaInstall()"><i class="fa-solid fa-download text-blue-600 text-base"></i> Install App (অ্যাপ ইনস্টল)</button>
+          <button class="card text-xs font-black text-center py-3 flex items-center justify-center gap-2 text-blue-900 bg-white border-2 border-blue-600" onclick="shareDirectApplicationFile()"><i class="fa-solid fa-share-nodes text-blue-600 text-base"></i> Share App (অ্যাপ শেয়ার)</button>
+        </div>
+
+        <!-- Customer Booking History Panel -->
+        <div id="customerHistoryPanel" class="card space-y-2">
+          <div class="flex items-center justify-between">
+            <b class="text-sm text-blue-900"><i class="fa-solid fa-clock-rotate-left text-blue-600 mr-1"></i> History (বুকিং ইতিহাস)</b>
+            <button class="btn btn-blue text-[10px] py-1" onclick="loadCustomerHistory()">Refresh (রিফ্রেশ)</button>
+          </div>
+          <div id="customerHistoryList" class="space-y-2 text-xs text-blue-900 font-bold">Your recent bookings will appear here.</div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ================= DRIVER PARTNER VIEW ================= -->
+    <section id="driverView" class="hidden space-y-3.5">
+
+      <!-- Driver Partner Login Card -->
+      <div id="driverLoginBox" class="card space-y-3">
+        <h3 class="font-black text-sm text-blue-900 flex items-center gap-2"><i class="fa-solid fa-right-to-bracket text-blue-600"></i> Partner Login (ড্রাইভার লগইন)</h3>
+        <input id="loginDrvPhone" class="field" type="tel" placeholder="Mobile Number (মোবাইল নম্বর)">
+        <input id="loginDrvPass" class="field" type="password" placeholder="Password (পাসওয়ার্ড)">
+        <button class="btn btn-blue w-full text-xs py-3" onclick="loginDriverAccount()"><i class="fa-solid fa-key"></i> Login Dashboard (লগইন করুন)</button>
+        <div class="text-center pt-1">
+          <button class="text-xs font-bold text-blue-600 underline" onclick="showDriverRegisterScreen()">New Driver Registration (Free Trial) — নতুন ড্রাইভার রেজিস্ট্রেশন</button>
+        </div>
+      </div>
+
+      <!-- Driver Registration Card -->
+      <div id="driverRegisterBox" class="card hidden space-y-3">
+        <h3 class="font-black text-sm text-blue-900 flex items-center gap-2"><i class="fa-solid fa-id-card text-blue-600"></i> Driver Registration (ড্রাইভার নিবন্ধন)</h3>
+        <input id="regDrvName" class="field" placeholder="Full Name (পূর্ণ নাম)">
+        <input id="regDrvPhone" class="field" type="tel" placeholder="Mobile / WhatsApp (মোবাইল নম্বর)">
+        <input id="regDrvPass" class="field" type="password" placeholder="Password (পাসওয়ার্ড)">
+        <input id="regDrvVehicleNo" class="field" placeholder="Vehicle Reg No (যেমন: WB89C0341)">
+        <select id="regDrvVehicleType" class="field">
+          <option value="Bike">Bike (বাইক)</option>
+          <option value="Parcel">Parcel (পার্সেল ডেলিভারি)</option>
+          <option value="Four Wheeler">Four Wheeler (চার চাকা)</option>
+          <option value="Toto">Toto (টোটো)</option>
+          <option value="Auto">Auto (অটো)</option>
+          <option value="Lorry">Lorry (লরি)</option>
+          <option value="Ambulance">Ambulance (অ্যাম্বুলেন্স)</option>
+        </select>
+        <button class="btn btn-blue w-full text-xs py-3" onclick="submitDriverRegistration()"><i class="fa-solid fa-paper-plane"></i> Register Account (নিবন্ধন করুন)</button>
+      </div>
+
+      <!-- Driver Dashboard Panel -->
+      <div id="driverDashboard" class="card hidden space-y-3.5">
+        <div class="flex justify-between items-center border-b border-blue-200 pb-3">
+          <div>
+            <h4 id="drvPanelName" class="font-black text-blue-900 text-sm">Welcome, Partner</h4>
+            <p id="drvPanelVehicle" class="text-[11px] font-bold text-slate-600">Vehicle No</p>
+            <p id="drvSubStatusText" class="text-[10px] font-black text-emerald-600 mt-0.5">Subscription: Active</p>
+          </div>
+          <span id="drvOnlineStatusBadge" class="bg-red-100 text-red-600 border border-red-300 px-3 py-1 rounded-full text-xs font-black">Offline</span>
+        </div>
+
+        <!-- Driver Earnings Box -->
+        <div class="bg-yellow-50 border border-blue-300 p-3 rounded-2xl flex justify-between items-center text-xs font-bold text-blue-900">
+          <div>
+            <p class="text-[10px] text-blue-800 uppercase">Total Earnings Today (আজকের আয়)</p>
+            <b id="drvTotalEarnings" class="text-lg text-blue-600 font-black">₹0</b>
+          </div>
+          <div class="text-right">
+            <p class="text-[10px] text-blue-800 uppercase">Completed (সম্পন্ন)</p>
+            <b id="drvCompletedCount" class="text-lg text-blue-900 font-black">0</b>
+          </div>
+        </div>
+
+        <!-- Transaction Limit & Pending Dues Alert Box for Driver Subscriptions -->
+        <div id="driverDueAlertBox" class="hidden bg-red-50 border-2 border-red-500 p-3 rounded-2xl space-y-2 text-xs font-bold text-red-700">
+          <div class="flex items-center gap-1.5">
+            <i class="fa-solid fa-triangle-exclamation text-base"></i>
+            <span>আপনার ট্রানজাকশন ডিউ বকেয়া রয়েছে!</span>
+          </div>
+          <p>বকেয়া ট্রানজাকশন ফি: <b id="driverDueAmount" class="text-sm">₹0</b></p>
+          <div class="bg-white p-2 rounded-xl border border-red-300 text-blue-900 space-y-2">
+            <p>কোম্পানি ইউপিআই আইডি: <b id="companyUpiDisplay" class="text-blue-600">Not Set</b></p>
+            <div id="companyScannerBox" class="text-center p-2 bg-yellow-50 rounded border border-blue-200">
+              <img id="companyUpiQrImg" class="w-32 h-32 mx-auto object-contain border rounded" src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=upi://pay?pa=company@okaxis" alt="UPI QR">
+            </div>
+            <input id="driverTxnIdInput" class="field text-xs" placeholder="Enter Transaction ID / UTR (ট্রানজাকশন আইডি লিখুন)">
+            <input id="driverTxnScreenshotFile" type="file" accept="image/*" class="field text-xs py-1 bg-white">
+            <button class="btn btn-green w-full text-xs py-2 mt-2" onclick="submitDriverTransactionPayment()"><i class="fa-solid fa-check"></i> Submit Transaction & Screenshot for Verification</button>
+          </div>
+        </div>
+
+        <button id="btnToggleDriverOnline" class="btn btn-blue w-full text-xs py-3" onclick="toggleDriverOnlineState()"><i class="fa-solid fa-power-off"></i> Go Online (অনলাইন হন)</button>
+
+        <div class="grid grid-cols-2 gap-2">
+          <button class="btn btn-yellow text-xs py-2 text-blue-900 font-bold" onclick="openDriverWhatsappGroup()"><i class="fa-brands fa-whatsapp"></i> WhatsApp Group</button>
+          <button class="btn btn-red text-xs py-2" onclick="logoutDriverAccount()"><i class="fa-solid fa-right-from-bracket"></i> Logout (লগআউট)</button>
+        </div>
+
+        <!-- Driver Active Execution Card -->
+        <div id="driverActiveRideCard" class="hidden bg-yellow-50 border-2 border-blue-600 p-3.5 rounded-2xl space-y-2.5">
+          <b class="text-xs font-black text-blue-900 flex justify-between items-center">
+            <span><i class="fa-solid fa-route mr-1"></i> Active Job Execution (সক্রিয় কাজ)</span>
+            <span id="drvRideStatusTag" class="bg-blue-600 text-white px-2.5 py-0.5 rounded-full text-[10px]">Accepted</span>
+          </b>
+          <div class="text-xs space-y-1 font-bold text-blue-900 bg-white p-2.5 rounded-xl border border-blue-300">
+            <p>Customer: <span id="activeCustName">Name</span> (<a id="activeCustCall" href="#" class="text-blue-600 underline font-black">Call</a>)</p>
+            <p>Fare Bill: <span id="activeCustFare" class="text-blue-600 font-black">₹0</span> | Dist: <span id="activeCustDist">0 km</span></p>
+            <div id="activeParcelInfo" class="hidden text-amber-700 border-t border-blue-200 pt-1 mt-1">
+              <p>📦 Parcel: <span id="activeParcelDesc">Item</span> (<span id="activeParcelWeight">0</span>)</p>
+              <p>Receiver: <span id="activeParcelRecv">Name</span> (<a id="activeParcelRecvCall" href="#" class="underline">Call</a>)</p>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-3 gap-1.5">
+            <a id="drvNavPickBtn" href="#" target="_blank" class="btn btn-blue text-[11px] py-2 px-1"><i class="fa-solid fa-location-arrow"></i> Pickup</a>
+            <a id="drvNavDropBtn" href="#" target="_blank" class="btn btn-blue text-[11px] py-2 px-1"><i class="fa-solid fa-map-pin"></i> Drop</a>
+            <button class="btn btn-yellow text-[11px] py-2 px-1 text-blue-900 font-bold" onclick="openLiveChatWindow()"><i class="fa-solid fa-comments"></i> Chat</button>
+          </div>
+
+          <div class="space-y-2">
+            <button id="btnArrivedAtPickup" class="btn btn-blue w-full text-xs py-2.5" onclick="markDriverArrived()"><i class="fa-solid fa-flag"></i> Arrived at Pickup (পিকআপে পৌঁছেছি)</button>
+            <div id="otpStartBox" class="flex gap-2">
+              <input id="inputVerifyOtp" class="field text-xs py-2" placeholder="Enter Customer OTP (ওটিপি দিন)">
+              <button class="btn btn-green text-xs py-2" onclick="verifyStartRideOtp()"><i class="fa-solid fa-play"></i> Start Ride (রাইড শুরু)</button>
+            </div>
+            <button id="btnCompleteRide" class="btn btn-green w-full text-xs py-2.5 hidden" onclick="completeDriverRide()"><i class="fa-solid fa-circle-check"></i> Complete & Collect Cash (সম্পন্ন করুন)</button>
+          </div>
+          <button class="btn btn-red w-full text-xs py-2" onclick="driverCancelActiveRide()"><i class="fa-solid fa-xmark"></i> Cancel Job (কাজ বাতিল)</button>
+        </div>
+
+        <!-- Realtime Incoming Booking & Parcel Requests Container -->
+        <div>
+          <h4 class="font-black text-xs text-blue-900 mb-2"><i class="fa-solid fa-bell text-blue-600 mr-1"></i> Live Incoming Job Requests (ইনকামিং রিকোয়েস্ট)</h4>
+          <div id="driverRequestsContainer" class="space-y-2">
+            <p class="text-xs text-slate-600 font-bold">Go online with active subscription to accept incoming jobs.</p>
+          </div>
+        </div>
+
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- ================= STORE REGISTRATION MODAL ================= -->
+  <div id="storeModal" class="modal hidden">
+    <div class="modal-inner space-y-3">
+      <div class="flex justify-between items-center border-b border-blue-200 pb-2">
+        <h3 class="font-black text-blue-900 text-sm flex items-center gap-2"><i class="fa-solid fa-store text-blue-600"></i> Store / Shop Registration (দোকান লিস্টিং)</h3>
+        <button onclick="closeStoreModal()" class="text-xl font-bold text-blue-900">×</button>
+      </div>
+
+      <div class="space-y-2 text-xs font-bold text-blue-900">
+        <input id="regStoreName" class="field text-xs" placeholder="Shop/Store Name (দোকানের নাম)">
+        <input id="regStorePhone" class="field text-xs" type="tel" placeholder="Phone Number (ফোন নম্বর)">
+        <input id="regStoreAddress" class="field text-xs" placeholder="Store Address (দোকানের ঠিকানা)">
+        <input id="regStoreItems" class="field text-xs" placeholder="Items Available (যেমন: Grocery, Sweets, Fast Food)">
+        
+        <div>
+          <label class="block text-[11px] text-blue-800">Upload Store Photo (দোকানের ছবি):</label>
+          <input id="regStorePhotoFile" type="file" accept="image/*" class="field text-xs py-1 bg-white">
+        </div>
+
+        <div class="bg-yellow-50 p-2.5 rounded-xl border border-blue-300 space-y-1">
+          <p>Subscription Status: <b id="modalSubPromptText" class="text-blue-600">Checking...</b></p>
+          <div id="storeSubscriptionPaymentArea" class="hidden space-y-2 pt-1 border-t border-blue-200">
+            <p class="text-[11px]">দোকান লিস্টিংয়ের জন্য মাসিক সাবস্ক্রিপশন (₹99) পেমেন্ট করতে নিচে স্ক্যান করুন:</p>
+            <img class="w-28 h-28 mx-auto object-contain border rounded bg-white" src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=upi://pay?pa=company@okaxis&am=99" alt="QR">
+            <input id="storeTxnIdInput" class="field text-xs" placeholder="Enter UPI Transaction ID">
+          </div>
+        </div>
+
+        <button class="btn btn-blue w-full text-xs py-2.5" onclick="submitStoreRegistration()"><i class="fa-solid fa-paper-plane"></i> Submit Store Listing (জমা দিন)</button>
+        <a id="storeWaSupportBtn" href="#" target="_blank" class="btn btn-green w-full text-xs py-2 text-center block"><i class="fa-brands fa-whatsapp"></i> Chat with Admin on WhatsApp for Listing</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= IN-APP LIVE CHAT MODAL ================= -->
+  <div id="chatModal" class="modal hidden">
+    <div class="modal-inner space-y-3 bg-white">
+      <div class="flex justify-between items-center border-b border-blue-200 pb-2">
+        <h3 class="font-black text-blue-900 text-sm flex items-center gap-2"><i class="fa-solid fa-comments text-blue-600"></i> In-App Live SMS Chat (লাইভ চ্যাট)</h3>
+        <button onclick="closeLiveChatWindow()" class="text-xl font-bold text-blue-900 hover:text-blue-600">×</button>
+      </div>
+
+      <div id="chatMessageList" class="space-y-2 h-64 overflow-y-auto p-2 bg-yellow-50 rounded-xl border border-blue-200"></div>
+
+      <div class="flex gap-2">
+        <input id="chatInputMessage" class="field text-xs" placeholder="Type message (মেসেজ লিখুন)...">
+        <button class="btn btn-blue text-xs py-2" onclick="sendInAppChatMessage()"><i class="fa-solid fa-paper-plane"></i> Send</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= MASTER ADMIN CONTROL PANEL MODAL ================= -->
+  <div id="adminModal" class="modal hidden">
+    <div class="modal-inner space-y-4">
+      <div class="flex justify-between items-center border-b border-blue-200 pb-3">
+        <h3 class="font-black text-blue-900 text-base flex items-center gap-2"><i class="fa-solid fa-user-shield text-blue-600"></i> Admin Master Panel (অ্যাডমিন প্যানেল)</h3>
+        <button onclick="closeAdminModal()" class="text-xl font-bold text-blue-900 hover:text-blue-600">×</button>
+      </div>
+
+      <div id="adminAuthBox" class="space-y-2">
+        <p class="text-xs font-bold text-blue-900">Enter Passcode (১১ বার লোগোতে ট্যাপ করুন বা পাসকোড দিন):</p>
+        <input id="adminPassInput" type="password" class="field" placeholder="Passcode">
+        <button class="btn btn-blue w-full text-xs py-2.5" onclick="authenticateAdmin()"><i class="fa-solid fa-key"></i> Authenticate (লগইন)</button>
+      </div>
+
+      <div id="adminContentBox" class="hidden space-y-4 text-xs max-h-[78vh] overflow-y-auto pr-1 text-blue-900">
+        
+        <!-- Global Branding & Image File Uploads -->
+        <div class="bg-yellow-50 p-3 rounded-2xl border border-blue-600 space-y-2 font-bold">
+          <b class="text-blue-900 block text-sm"><i class="fa-solid fa-sliders"></i> Branding, Logo, Banners & UPI Config</b>
+          <div>
+            <label class="block text-[11px] text-blue-800">App Brand Name (কোম্পানির নাম):</label>
+            <input id="admCompanyName" class="field text-xs py-1.5" placeholder="Public Cab">
+          </div>
+          <div>
+            <label class="block text-[11px] text-blue-800">Upload Logo Image (লোগো ফাইল আপলোড):</label>
+            <input id="admLogoFile" type="file" accept="image/*" class="field text-xs py-1.5 bg-white">
+          </div>
+          <div>
+            <label class="block text-[11px] text-blue-800">Upload Banner Image (ব্যানার/পোস্টার ফাইল আপলোড):</label>
+            <input id="admBannerFile" type="file" accept="image/*" class="field text-xs py-1.5 bg-white">
+          </div>
+          <div>
+            <label class="block text-[11px] text-blue-800">Company UPI ID (পেমেন্ট নেওয়ার ইউপিআই আইডি):</label>
+            <input id="admCompanyUpi" class="field text-xs py-1.5" placeholder="company@okaxis">
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-[10px] text-blue-800">Driver Sub. On/Off:</label>
+              <select id="admDriverSubToggle" class="field text-xs py-1">
+                <option value="on">ON (সক্রিয়)</option>
+                <option value="off">OFF (বন্ধ)</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-[10px] text-blue-800">Store Sub. On/Off:</label>
+              <select id="admStoreSubToggle" class="field text-xs py-1">
+                <option value="on">ON (সক্রিয়)</option>
+                <option value="off">OFF (বন্ধ)</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <label class="block text-[11px] text-blue-800">Subscription Price (₹ ড্রাইভার সাবস্ক্রিপশন মূল্য):</label>
+            <input id="admSubPrice" class="field text-xs py-1.5" type="number" placeholder="299">
+          </div>
+          <div>
+            <label class="block text-[11px] text-blue-800">Admin WhatsApp Number (সাপোর্ট নম্বর):</label>
+            <input id="admWhatsappNo" class="field text-xs py-1.5" placeholder="919609546435">
+          </div>
+          <div>
+            <label class="block text-[11px] text-blue-800">Driver WhatsApp Group Link (ড্রাইভার গ্রুপ লিংক):</label>
+            <input id="admWaGroupLink" class="field text-xs py-1.5" placeholder="https://chat.whatsapp.com/...">
+          </div>
+          <div>
+            <label class="block text-[11px] text-blue-800">App Share Link (অ্যাপ শেয়ার লিংক):</label>
+            <input id="admShareAppLink" class="field text-xs py-1.5" placeholder="https://...">
+          </div>
+          <button class="btn btn-blue w-full text-xs py-2" onclick="saveAdminGlobalSettings()"><i class="fa-solid fa-floppy-disk"></i> Save System Config (সেভ করুন)</button>
+        </div>
+
+        <!-- Vehicle Rates & GPS Range Management -->
+        <div class="bg-yellow-50 p-3 rounded-2xl border border-blue-600 space-y-2 font-bold">
+          <b class="text-blue-900 block text-sm"><i class="fa-solid fa-indian-rupee-sign"></i> Rates & Driver Radius Range (ড্রাইভার রেঞ্জ কিমি)</b>
+          <div>
+            <label class="block text-[11px] text-blue-800">Driver Radius Limit (KM):</label>
+            <input id="admDriverRadiusKm" class="field text-xs py-1" type="number" value="5" placeholder="5">
+          </div>
+          <div id="adminRatesConfigList" class="space-y-2"></div>
+          <button class="btn btn-blue w-full text-xs py-2" onclick="saveAdminVehicleRates()"><i class="fa-solid fa-floppy-disk"></i> Save Rates & Range (সেভ করুন)</button>
+        </div>
+
+        <!-- Stores / Shops Management Panel -->
+        <div class="bg-yellow-50 p-3 rounded-2xl border border-blue-600 space-y-2 font-bold">
+          <b class="text-blue-900 block text-sm"><i class="fa-solid fa-store"></i> Registered Stores & Shop Approvals</b>
+          <div id="adminStoresApprovalList" class="space-y-2 max-h-44 overflow-y-auto"></div>
+        </div>
+
+        <!-- Driver Transactions & Dues Verification Management -->
+        <div class="bg-yellow-50 p-3 rounded-2xl border border-blue-600 space-y-2 font-bold">
+          <b class="text-blue-900 block text-sm"><i class="fa-solid fa-receipt"></i> Driver Transaction Dues Verification (পেমেন্ট ভেরিফিকেশন)</b>
+          <div id="adminDriverTxnVerifyList" class="space-y-2 max-h-48 overflow-y-auto"></div>
+        </div>
+
+        <!-- Customers List -->
+        <div class="bg-yellow-50 p-3 rounded-2xl border border-blue-600 space-y-2 font-bold">
+          <b class="text-blue-900 block text-sm"><i class="fa-solid fa-users"></i> Registered Customers List (কাস্টমার তালিকা)</b>
+          <div id="adminCustomersList" class="space-y-1.5 max-h-40 overflow-y-auto"></div>
+        </div>
+
+        <!-- Drivers Management -->
+        <div class="bg-yellow-50 p-3 rounded-2xl border border-blue-600 space-y-2 font-bold">
+          <b class="text-blue-900 block text-sm"><i class="fa-solid fa-car"></i> Partner / Driver Approvals & Subscriptions</b>
+          <div id="adminDriversList" class="space-y-2"></div>
+        </div>
+
+        <!-- Live Rides Monitor -->
+        <div class="bg-yellow-50 p-3 rounded-2xl border border-blue-600 space-y-2 font-bold">
+          <b class="text-blue-900 block text-sm"><i class="fa-solid fa-satellite-dish"></i> Live Ongoing Jobs Monitor (লাইভ রাইড মনিটর)</b>
+          <div id="adminLiveRidesList" class="space-y-2"></div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Floating Support Button -->
+  <div class="chat-widget-btn" onclick="openFloatingSupportChat()">
+    <i class="fa-solid fa-comments text-xl"></i>
+  </div>
+
+  <!-- Bottom Navigation Bar -->
+  <div class="bottom-nav">
+    <div class="nav-item active" onclick="switchTab('customer')">
+      <i class="fa-solid fa-house"></i>
+      <span>Home</span>
+    </div>
+    <div class="nav-item" onclick="loadCustomerHistory()">
+      <i class="fa-solid fa-clock-rotate-left"></i>
+      <span>Bookings</span>
+    </div>
+    <div class="nav-item" onclick="switchTab('driver')">
+      <i class="fa-solid fa-car"></i>
+      <span>Driver</span>
+    </div>
+    <div class="nav-item" onclick="openFloatingSupportChat()">
+      <i class="fa-solid fa-headset"></i>
+      <span>Help</span>
+    </div>
+  </div>
+
+</div>
+
+<!-- JavaScript Core Application Engine -->
+<script>
+// Firebase Realtime Database Config
+const firebaseConfig = {
+  apiKey: "AIzaSyDJmu9uD5rT5ee1jNLpMQaTVIa_-yTrPzw",
+  authDomain: "public-service-11054.firebaseapp.com",
+  databaseURL: "https://public-service-11054-default-rtdb.firebaseio.com",
+  projectId: "public-service-11054",
+  storageBucket: "public-service-11054.firebasestorage.app",
+  messagingSenderId: "639313474404",
+  appId: "1:639313474404:web:9ac4645e521021c044c071"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+const $ = id => document.getElementById(id);
+
+let defaultVehicleRates = {
+  'Bike': { base: 20, perKm: 8, icon: 'fa-motorcycle', img: 'https://images.unsplash.com/photo-1558981806-ec527fa84c39?w=300&auto=format&fit=crop' },
+  'Parcel': { base: 25, perKm: 9, icon: 'fa-box', img: 'https://cdn-icons-png.flaticon.com/512/2972/2972531.png' },
+  'Four Wheeler': { base: 50, perKm: 12, icon: 'fa-car', img: 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=300&auto=format&fit=crop' },
+  'Toto': { base: 25, perKm: 9, icon: 'fa-truck-pickup', img: 'https://images.unsplash.com/photo-1519608487953-e999c86e7455?w=300&auto=format&fit=crop' },
+  'Auto': { base: 30, perKm: 10, icon: 'fa-taxi', img: 'https://images.unsplash.com/photo-1591768793355-74d04bb6608f?w=300&auto=format&fit=crop' },
+  'Lorry': { base: 100, perKm: 20, icon: 'fa-truck', img: 'https://images.unsplash.com/photo-1519003722824-194d4455a60c?w=300&auto=format&fit=crop' },
+  'Ambulance': { base: 150, perKm: 18, icon: 'fa-truck-medical', img: 'https://images.unsplash.com/photo-1587745416684-47953f16f02f?w=300&auto=format&fit=crop' }
+};
+
+let vehicleRates = JSON.parse(JSON.stringify(defaultVehicleRates));
+let selectedCategory = 'Bike';
+let map, pickupLatLng = null, dropLatLng = null, mapSelectionMode = 'pickup';
+let pickupMarker = null, dropMarker = null, driverMarker = null, routePolyline = null;
+let currentBookingId = null, logoTapCounter = 0;
+let currentCustomerId = localStorage.getItem('inride_cust_id') || null;
+let currentDriverId = localStorage.getItem('inride_driver_id') || null;
+let driverGpsInterval = null;
+let currentCompanySettings = {};
+let autoSearchTimer = null;
+let deferredPwaPrompt = null;
+let chatMessagesListener = null;
+
+// Unique Device ID generation
+let deviceUniqueId = localStorage.getItem('inride_device_uuid');
+if (!deviceUniqueId) {
+  deviceUniqueId = 'dev_' + Math.random().toString(36.2) + Date.now();
+  localStorage.setItem('inride_device_uuid', deviceUniqueId);
+}
+
+// Dynamic PWA Manifest Setup
+function setupDynamicManifest() {
+  const manifestData = {
+    name: currentCompanySettings.companyName || "Public Cab Express",
+    short_name: "PublicCab",
+    start_url: "./",
+    display: "standalone",
+    background_color: "#fef08a",
+    theme_color: "#2563eb",
+    icons: [{ src: currentCompanySettings.logoUrl || "https://cdn-icons-png.flaticon.com/512/727/727245.png", sizes: "192x192", type: "image/png" }]
+  };
+  const blob = new Blob([JSON.stringify(manifestData)], { type: 'application/manifest+json' });
+  $('manifestPlaceholder').href = URL.createObjectURL(blob);
+}
+
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferredPwaPrompt = e; });
+function triggerPwaInstall() {
+  if (deferredPwaPrompt) { 
+    deferredPwaPrompt.prompt(); 
+    deferredPwaPrompt.userChoice.then(() => { deferredPwaPrompt = null; });
+  } else { 
+    alert('ইনস্টল করার জন্য ব্রাউজারের থ্রি-ডট (⋮) অথবা শেয়ার অপশনে ক্লিক করে "Add to Home Screen" অথবা "Install App" চয়ন করুন।'); 
+  }
+}
+
+// Clear, Professional Hindi Voice Announcement
+function speakAudioAlert(text) {
+  if ('speechSynthesis' in window) {
+    window.speechSynthesis.cancel();
+    const uttr = new SpeechSynthesisUtterance(text);
+    uttr.lang = 'hi-IN'; uttr.rate = 1.0;
+    window.speechSynthesis.speak(uttr);
+  }
+}
+
+function switchTab(tab) {
+  $('customerView').classList.toggle('hidden', tab !== 'customer');
+  $('driverView').classList.toggle('hidden', tab !== 'driver');
+  $('tabCust').className = 'px-3 py-1 rounded-full ' + (tab === 'customer' ? 'bg-blue-600 text-white shadow' : 'text-blue-900');
+  $('tabDrv').className = 'px-3 py-1 rounded-full ' + (tab === 'driver' ? 'bg-blue-600 text-white shadow' : 'text-blue-900');
+  setTimeout(() => map && map.invalidateSize(), 200);
+}
+
+function initMap() {
+  if (map) return;
+  map = L.map('map').setView([22.5726, 88.3639], 13);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+  map.on('click', e => setMapPoint(mapSelectionMode, [e.latlng.lat, e.latlng.lng]));
+}
+
+function checkAndShowMap() {
+  if (pickupLatLng && dropLatLng) {
+    $('mapContainer').classList.add('show');
+    initMap();
+    calculateRoute();
+  }
+}
+
+function setMapPoint(type, coords) {
+  initMap();
+  if (type === 'pickup') {
+    pickupLatLng = coords;
+    if (pickupMarker) map.removeLayer(pickupMarker);
+    pickupMarker = L.marker(coords).addTo(map).bindPopup('Pickup Location').openPopup();
+  } else {
+    dropLatLng = coords;
+    if (dropMarker) map.removeLayer(dropMarker);
+    dropMarker = L.marker(coords).addTo(map).bindPopup('Drop Location').openPopup();
+  }
+  checkAndShowMap();
+}
+
+function getCurrentGpsLocation() {
+  if (!navigator.geolocation) return alert('GPS সুবিধা সমর্থিত নয়');
+  navigator.geolocation.getCurrentPosition(pos => {
+    const latlng = [pos.coords.latitude, pos.coords.longitude];
+    setMapPoint('pickup', latlng);
+    $('inputManualPickup').value = "Current Live GPS Location (GPS Verified)";
+    loadNearbyStoresAndShops(latlng);
+  }, () => alert('অনুগ্রহ করে ফোনের লোকেশন পারমিশন চালু করুন।'), { enableHighAccuracy: true });
+}
+
+async function calculateRoute() {
+  if (!pickupLatLng || !dropLatLng) return;
+  try {
+    const url = `https://router.project-osrm.org/route/v1/driving/${pickupLatLng[1]},${pickupLatLng[0]};${dropLatLng[1]},${dropLatLng[0]}?overview=full&geometries=geojson`;
+    const res = await fetch(url);
+    const data = await res.json();
+    if (data.routes && data.routes[0]) {
+      const route = data.routes[0];
+      const distKm = route.distance / 1000;
+      const pts = route.geometry.coordinates.map(c => [c[1], c[0]]);
+      if (routePolyline) map.removeLayer(routePolyline);
+      routePolyline = L.polyline(pts, { color: '#2563eb', weight: 5 }).addTo(map);
+      map.fitBounds(routePolyline.getBounds().pad(0.2));
+      updateFareCalculation(distKm);
+    }
+  } catch (e) {
+    const dist = getStraightDistanceKm(pickupLatLng, dropLatLng);
+    updateFareCalculation(dist);
+  }
+}
+
+function getStraightDistanceKm(p1, p2) {
+  const rad = x => x * Math.PI / 180;
+  const dLat = rad(p2[0] - p1[0]), dLon = rad(p2[1] - p1[1]);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(rad(p1[0])) * Math.cos(rad(p2[0])) * Math.sin(dLon / 2) ** 2;
+  return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function updateFareCalculation(km) {
+  const r = vehicleRates[selectedCategory] || vehicleRates['Bike'];
+  let fare = r.base;
+  if (km > 3) fare += Math.ceil((km - 3) * r.perKm);
+  $('displayDistance').textContent = km.toFixed(2) + ' km';
+  $('displayFare').textContent = '₹' + fare;
+}
+
+function renderCategoryGrid() {
+  const keys = Object.keys(vehicleRates);
+  $('categoryGrid').innerHTML = keys.map(k => {
+    const r = vehicleRates[k];
+    return `<div class="cat-card ${selectedCategory === k ? 'active' : ''}" onclick="selectCategory('${k}')">
+      <img class="vehicle-photo" src="${r.img}" alt="${k}">
+      <div class="font-black text-[11px]">${k}</div>
+      <div class="text-[9px] font-bold">₹${r.base} Base</div>
+    </div>`;
+  }).join('');
+}
+
+function selectCategory(cat) {
+  selectedCategory = cat;
+  renderCategoryGrid();
+  $('parcelFields').classList.toggle('show', cat === 'Parcel');
+  if (pickupLatLng && dropLatLng) calculateRoute();
+}
+
+function handleAddressAutoSearch(inputId) {
+  clearTimeout(autoSearchTimer);
+  const q = $(inputId).value.trim();
+  const sugBox = $(inputId + 'Suggestions');
+  if (q.length < 3) { sugBox.classList.add('hidden'); return; }
+
+  autoSearchTimer = setTimeout(async () => {
+    try {
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&q=${encodeURIComponent(q)}`);
+      const data = await res.json();
+      if (data && data.length) {
+        sugBox.innerHTML = data.map(item => `
+          <div class="autocomplete-item" onclick="selectAddressLocation('${inputId}', ${item.lat}, ${item.lon}, '${item.display_name.replace(/'/g, "")}')">
+            ${item.display_name}
+          </div>
+        `).join('');
+        sugBox.classList.remove('hidden');
+      }
+    } catch (e) {}
+  }, 400);
+}
+
+function selectAddressLocation(inputId, lat, lon, name) {
+  $(inputId).value = name;
+  $(inputId + 'Suggestions').classList.add('hidden');
+  const type = inputId === 'inputManualPickup' ? 'pickup' : 'drop';
+  const latlng = [parseFloat(lat), parseFloat(lon)];
+  setMapPoint(type, latlng);
+  if (type === 'pickup') loadNearbyStoresAndShops(latlng);
+}
+
+// Nearby Stores & Shops Management
+function loadNearbyStoresAndShops(currentCoords) {
+  db.ref('stores').on('value', snap => {
+    const stores = snap.val() || {};
+    const storeSubOn = currentCompanySettings.storeSubToggle !== 'off';
+    const now = Date.now();
+
+    let html = '';
+    Object.values(stores).forEach(st => {
+      const subActive = (st.subscriptionExpiry || 0) > now;
+      if (!storeSubOn || subActive || st.status === 'Approved') {
+        let dist = currentCoords ? getStraightDistanceKm(currentCoords, st.latlng || [22.57, 88.36]).toFixed(1) : '0.0';
+        html += `
+          <div class="bg-yellow-50 p-2.5 rounded-xl border border-blue-200 flex items-center gap-3">
+            <img src="${st.photoUrl || 'https://cdn-icons-png.flaticon.com/512/3081/3081559.png'}" class="w-12 h-12 object-cover rounded-lg border">
+            <div class="flex-1 text-xs">
+              <b class="text-blue-900 text-sm block">${st.name}</b>
+              <p class="text-slate-700 font-bold">${st.items} · <span class="text-emerald-600">${dist} km away</span></p>
+              <p class="text-[10px] text-blue-800">${st.address}</p>
+            </div>
+            <a href="tel:${st.phone}" class="btn btn-green text-xs py-2 px-3"><i class="fa-solid fa-phone"></i> Call</a>
+          </div>
+        `;
+      }
+    });
+    $('nearbyStoresContainer').innerHTML = html || '<p class="text-xs text-slate-600 font-bold">আশেপাশে কোনো দোকান লিস্টিং নেই।</p>';
+  });
+}
+
+function openStoreRegistrationModal() {
+  $('storeModal').classList.remove('hidden');
+  const storeSubOn = currentCompanySettings.storeSubToggle !== 'off';
+  $('modalSubPromptText').textContent = storeSubOn ? 'Subscription Active (₹99/mo)' : 'Free Listing Mode';
+  $('storeSubscriptionPaymentArea').classList.toggle('hidden', !storeSubOn);
+  
+  const supNo = currentCompanySettings.whatsappNo || "9609546435";
+  $('storeWaSupportBtn').href = `https://wa.me/91${supNo}?text=Hello%20Admin,%20I%20want%20to%20list%20my%20store!`;
+}
+
+function closeStoreModal() { $('storeModal').classList.add('hidden'); }
+
+function submitStoreRegistration() {
+  const name = $('regStoreName').value.trim();
+  const phone = $('regStorePhone').value.trim();
+  const address = $('regStoreAddress').value.trim();
+  const items = $('regStoreItems').value.trim();
+  const photoFile = $('regStorePhotoFile').files[0];
+
+  if (!name || !phone || !address) return alert('দয়া করে দোকানের নাম, ফোন ও ঠিকানা দিন।');
+
+  const storeSubOn = currentCompanySettings.storeSubToggle !== 'off';
+  const storeId = 'store_' + phone;
+  const latlng = pickupLatLng || [22.5726, 88.3639];
+
+  const reader = new FileReader();
+  reader.onload = e => {
+    const photoUrl = e.target.result;
+    const storeObj = {
+      id: storeId, name, phone, address, items, photoUrl, latlng,
+      status: storeSubOn ? 'Pending' : 'Approved',
+      subscriptionExpiry: storeSubOn ? Date.now() + (30*24*60*60*1000) : Date.now() + (365*24*60*60*1000)
+    };
+
+    db.ref('stores/' + storeId).set(storeObj).then(() => {
+      alert(storeSubOn ? 'দোকান রেজিস্ট্রেশন সফল হয়েছে! অ্যাডমিন অ্যাপ্রুভালের পর এটি কাস্টমার অ্যাপে দেখাবে।' : 'দোকান সফলভাবে লিস্টিং হয়ে গেছে!');
+      closeStoreModal();
+    });
+  };
+
+  if (photoFile) reader.readAsDataURL(photoFile);
+  else {
+    const storeObj = {
+      id: storeId, name, phone, address, items, photoUrl: '', latlng,
+      status: storeSubOn ? 'Pending' : 'Approved',
+      subscriptionExpiry: Date.now() + (30*24*60*60*1000)
+    };
+    db.ref('stores/' + storeId).set(storeObj).then(() => {
+      alert('দোকান রেজিস্ট্রেশন সফল হয়েছে!');
+      closeStoreModal();
+    });
+  }
+}
+
+function loginOrRegisterCustomer() {
+  const phone = $('custAuthPhone').value.trim();
+  const name = $('custAuthName').value.trim();
+  if (!phone || !name) return alert('দয়া করে আপনার ফোন নম্বর এবং নাম প্রদান করুন।');
+
+  const cId = 'cust_' + phone;
+  const custObj = { id: cId, name, phone, deviceId: deviceUniqueId, registeredAt: Date.now() };
+
+  db.ref('customers/' + cId).set(custObj).then(() => {
+    currentCustomerId = cId;
+    localStorage.setItem('inride_cust_id', cId);
+    verifyCustomerState();
+  });
+}
+
+function verifyCustomerState() {
+  if (!currentCustomerId) return;
+  db.ref('customers/' + currentCustomerId).once('value', snap => {
+    const c = snap.val();
+    if (c) {
+      $('customerAuthCard').classList.add('hidden');
+      $('customerMainDashboard').classList.remove('hidden');
+      renderCategoryGrid();
+      loadNearbyStoresAndShops(null);
+    }
+  });
+}
+
+function submitBooking() {
+  if (!pickupLatLng || !dropLatLng) return alert('অনুগ্রহ করে পিকআপ এবং ড্রপ লোকেশন সঠিকভাবে সেট করুন।');
+  
+  db.ref('customers/' + currentCustomerId).once('value', custSnap => {
+    const cust = custSnap.val() || { name: 'Customer', phone: '9999999999', txnDue: 0 };
+    let currentDue = cust.txnDue || 0;
+    currentDue += 5;
+
+    const distStr = $('displayDistance').textContent;
+    let fareAmt = parseInt($('displayFare').textContent.replace('₹','')) || 50;
+    let totalBillWithDue = fareAmt + 5; 
+
+    const otp = String(Math.floor(1000 + Math.random() * 9000));
+    const bId = 'ride_' + Date.now();
+    const nowIso = new Date().toLocaleString('en-IN');
+
+    const bookingData = {
+      id: bId, customerId: currentCustomerId, customerName: cust.name, customerPhone: cust.phone,
+      pickupLatLng, dropLatLng, category: selectedCategory,
+      distance: distStr, fare: totalBillWithDue, baseFare: fareAmt, txnFee: 5, otp, status: 'Searching', createdTimestamp: Date.now(), dateTimeStr: nowIso
+    };
+
+    if (selectedCategory === 'Parcel') {
+      bookingData.parcelDetails = {
+        desc: $('parcelDescription').value.trim() || 'General Parcel',
+        weight: $('parcelWeight').value.trim() || '1 Unit',
+        senderName: $('parcelPickupName').value.trim() || cust.name,
+        senderPhone: $('parcelPickupPhone').value.trim() || cust.phone,
+        receiverName: $('parcelReceiverName').value.trim() || 'Receiver',
+        receiverPhone: $('parcelReceiverPhone').value.trim() || ''
+      };
+    }
+
+    db.ref('customers/' + currentCustomerId + '/txnDue').set(currentDue);
+
+    db.ref('rides/' + bId).set(bookingData).then(() => {
+      currentBookingId = bId;
+
+      const adminPhone = currentCompanySettings.whatsappNo || "919609546435";
+      const waMsg = encodeURIComponent(`🚨 NEW BOOKING (${selectedCategory.toUpperCase()})\nCustomer: ${cust.name} (${cust.phone})\nFare: ₹${totalBillWithDue}\nDist: ${distStr}`);
+      window.open(`https://wa.me/${adminPhone}?text=${waMsg}`, '_blank');
+
+      speakAudioAlert('آپ کی رائڈ بکنگ کنفرم کر دی گئی ہے۔ ڈرائیور کو بھیج دیا گیا ہے۔');
+      trackCustomerRideState(bId);
+    });
+  });
+}
+
+function trackCustomerRideState(bId) {
+  $('customerRideCard').classList.remove('hidden');
+  $('customerSearchState').classList.remove('hidden');
+  $('customerMatchedState').classList.add('hidden');
+
+  db.ref('rides/' + bId).on('value', snap => {
+    const r = snap.val();
+    if (!r) return;
+
+    if (['Accepted', 'Arrived', 'InProgress'].includes(r.status)) {
+      $('customerSearchState').classList.add('hidden');
+      $('customerMatchedState').classList.remove('hidden');
+      $('customerView').classList.add('booking-locked');
+
+      $('custDriverName').textContent = r.driverName || 'Partner';
+      $('custVehicleDetails').textContent = `${r.category} · ${r.driverVehicle || ''}`;
+      $('custCallBtn').href = `tel:${r.driverPhone}`;
+      $('custRideOtp').textContent = r.otp;
+      $('custRideFare').textContent = '₹' + r.fare;
+
+      if (r.driverId && map) {
+        db.ref('drivers/' + r.driverId + '/location').on('value', locSnap => {
+          const l = locSnap.val();
+          if (l) {
+            const dCoords = [l.lat, l.lng];
+            if (driverMarker) map.removeLayer(driverMarker);
+            driverMarker = L.marker(dCoords, {
+              icon: L.icon({ iconUrl: 'https://cdn-icons-png.flaticon.com/512/3202/3202926.png', iconSize: [36, 36] })
+            }).addTo(map);
+
+            const liveDist = getStraightDistanceKm(dCoords, r.status === 'InProgress' ? r.dropLatLng : r.pickupLatLng);
+            const etaMins = Math.ceil((liveDist / 25) * 60);
+            $('custEtaText').textContent = `${liveDist.toFixed(2)} km away · ETA ~${etaMins} mins`;
+          }
+        });
+      }
+    } else if (r.status === 'Completed') {
+      speakAudioAlert('آپ کی یاترا سفلتاپُورمک سمپورن ہو گئی ہے۔ ધന്യવાદ!');
+      $('customerView').classList.remove('booking-locked');
+      $('customerRideCard').classList.add('hidden');
+      loadCustomerHistory();
+    } else if (r.status === 'Cancelled') {
+      alert('রাইডটি বাতিল করা হয়েছে।');
+      $('customerView').classList.remove('booking-locked');
+      $('customerRideCard').classList.add('hidden');
+    }
+  });
+}
+
+function cancelCustomerBooking() {
+  if (!currentBookingId) return;
+  db.ref('rides/' + currentBookingId).once('value', snap => {
+    const r = snap.val();
+    if (r && r.status === 'Searching') {
+      db.ref('rides/' + currentBookingId + '/status').set('Cancelled');
+      $('customerView').classList.remove('booking-locked');
+      $('customerRideCard').classList.add('hidden');
+      alert('আপনার বুকিং সফলভাবে বাতিল করা হয়েছে। (৫ টাকা ক্যান্সেলেশন ফাইন পরবর্তী বুকিংয়ে যুক্ত হবে)');
+    } else {
+      alert('ড্রাইভার বুকিং গ্রহণ করার পর কাস্টমার বুকিং বাতিল করতে পারবেন না।');
+    }
+  });
+}
+
+function loadCustomerHistory() {
+  if (!currentCustomerId) return alert('অনুগ্রহ করে আগে লগইন করুন।');
+
+  db.ref('customers/' + currentCustomerId).once('value', snap => {
+    const cust = snap.val();
+    if (!cust) return;
+
+    db.ref('rides').orderByChild('customerId').equalTo(currentCustomerId).once('value', ridesSnap => {
+      const rides = ridesSnap.val() || {};
+      const rows = Object.values(rides);
+
+      $('customerHistoryList').innerHTML = rows.length ? rows.map(r => `
+        <div class="bg-yellow-50 p-3 rounded-xl border border-blue-300 space-y-2">
+          <div class="flex justify-between font-black text-blue-900">
+            <span>${r.category} · ₹${r.fare}</span>
+            <span class="text-blue-600">${r.status}</span>
+          </div>
+          <p class="text-blue-900 text-[11px]">Driver: <b>${r.driverName || 'Not Assigned'}</b> | Time: ${r.dateTimeStr || new Date(r.createdTimestamp).toLocaleTimeString()}</p>
+        </div>
+      `).join('') : 'কোনো বুকিং পাওয়া যায়নি।';
+    });
+  });
+}
+
+// Live In-App Chat
+function openLiveChatWindow() {
+  if (!currentBookingId) return alert("লাইভ চ্যাটের জন্য কোনো বুকিং সক্রিয় নেই।");
+  $('chatModal').classList.remove('hidden');
+  
+  if (chatMessagesListener) db.ref('chats/' + currentBookingId).off('value', chatMessagesListener);
+  chatMessagesListener = db.ref('chats/' + currentBookingId).on('value', snap => {
+    const msgs = snap.val() || {};
+    $('chatMessageList').innerHTML = Object.values(msgs).map(m => `
+      <div class="${m.sender === 'Customer' ? 'chat-bubble-cust' : 'chat-bubble-other'}">
+        <b class="block text-[9px] opacity-75">${m.sender}</b>
+        ${m.text}
+      </div>
+    `).join('');
+  });
+}
+function closeLiveChatWindow() { $('chatModal').classList.add('hidden'); }
+
+function sendInAppChatMessage() {
+  const text = $('chatInputMessage').value.trim();
+  if (!text || !currentBookingId) return;
+  const isDriver = currentDriverId && !$('driverDashboard').classList.contains('hidden');
+  db.ref('chats/' + currentBookingId).push({
+    sender: isDriver ? 'Driver' : 'Customer', text, timestamp: Date.now()
+  }).then(() => $('chatInputMessage').value = '');
+}
+
+function showDriverRegisterScreen() {
+  $('driverLoginBox').classList.add('hidden');
+  $('driverRegisterBox').classList.remove('hidden');
+}
+
+function submitDriverRegistration() {
+  const name = $('regDrvName').value.trim(), phone = $('regDrvPhone').value.trim();
+  const pass = $('regDrvPass').value.trim(), vehicleNo = $('regDrvVehicleNo').value.trim();
+  const vehicleType = $('regDrvVehicleType').value;
+
+  if (!name || !phone || !pass || !vehicleNo) return alert('ড্রাইভার নিবন্ধনের সমস্ত তথ্য প্রদান করুন।');
+
+  const drvId = 'drv_' + phone;
+  const trialExpires = Date.now() + (15 * 24 * 60 * 60 * 1000);
+  const driverObj = {
+    id: drvId, name, phone, password: pass, vehicleNo, vehicleType,
+    deviceId: deviceUniqueId, status: 'Pending', online: false, subscriptionExpiry: trialExpires, txnDue: 0
+  };
+
+  db.ref('drivers/' + drvId).set(driverObj).then(() => {
+    alert('ড্রাইভার নিবন্ধন সফল হয়েছে! ১৫ দিনের ফ্রি ট্রায়াল দেওয়া হয়েছে।');
+    $('driverRegisterBox').classList.add('hidden');
+    $('driverLoginBox').classList.remove('hidden');
+  });
+}
+
+function loginDriverAccount() {
+  const phone = $('loginDrvPhone').value.trim(), pass = $('loginDrvPass').value.trim();
+  db.ref('drivers').once('value', snap => {
+    const drivers = snap.val() || {};
+    const foundId = Object.keys(drivers).find(id => drivers[id].phone === phone && drivers[id].password === pass);
+
+    if (foundId) {
+      const d = drivers[foundId];
+      if (d.status !== 'Approved') return alert('আপনার অ্যাকাউন্টটি এখনও অ্যাডমিন দ্বারা অ্যাপ্রুভ করা হয়নি।');
+      
+      if (d.deviceId && d.deviceId !== deviceUniqueId) {
+        return alert('নিরাপত্তার কারণে এই ড্রাইভার অ্যাকাউন্টটি অন্য ডিভাইসে লগইন করা আছে।');
+      }
+      if (!d.deviceId) {
+        db.ref('drivers/' + foundId + '/deviceId').set(deviceUniqueId);
+      }
+
+      currentDriverId = foundId;
+      localStorage.setItem('inride_driver_id', foundId);
+      verifyDriverAccountState(foundId);
+    } else alert('ভুল ফোন নম্বর অথবা পাসওয়ার্ড দেওয়া হয়েছে।');
+  });
+}
+
+function verifyDriverAccountState(drvId) {
+  db.ref('drivers/' + drvId).on('value', snap => {
+    const d = snap.val();
+    if (!d) return;
+
+    $('driverLoginBox').classList.add('hidden');
+    $('driverDashboard').classList.remove('hidden');
+
+    $('drvPanelName').textContent = `Welcome, ${d.name}`;
+    $('drvPanelVehicle').textContent = `${d.vehicleType} · ${d.vehicleNo}`;
+
+    const now = Date.now();
+    const expiry = d.subscriptionExpiry || 0;
+    const daysLeft = Math.ceil((expiry - now) / (1000 * 60 * 60 * 24));
+    const subActiveOnOff = currentCompanySettings.driverSubToggle !== 'off';
+
+    if (subActiveOnOff && now > expiry) {
+      $('drvSubStatusText').textContent = 'Subscription Expired! Please renew.';
+      $('drvSubStatusText').className = 'text-[10px] font-black text-red-600 mt-0.5';
+    } else {
+      $('drvSubStatusText').textContent = subActiveOnOff ? `Subscription Active (${daysLeft} days left)` : 'Subscription Free Mode';
+      $('drvSubStatusText').className = 'text-[10px] font-black text-emerald-600 mt-0.5';
+    }
+
+    const txnDue = d.txnDue || 0;
+    if (txnDue > 0) {
+      $('driverDueAlertBox').classList.remove('hidden');
+      $('driverDueAmount').textContent = '₹' + txnDue;
+      const upi = currentCompanySettings.upiId || "company@okaxis";
+      $('companyUpiDisplay').textContent = upi;
+      $('companyUpiQrImg').src = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=upi://pay?pa=${encodeURIComponent(upi)}`;
+    } else {
+      $('driverDueAlertBox').classList.add('hidden');
+    }
+
+    loadDriverEarningsAndStats(drvId);
+    loadDriverIncomingRequests(d);
+    checkActiveDriverRide(drvId);
+  });
+}
+
+function submitDriverTransactionPayment() {
+  const txnId = $('driverTxnIdInput').value.trim();
+  const fileInput = $('driverTxnScreenshotFile').files[0];
+  if (!txnId) return alert('অনুগ্রহ করে সঠিক ট্রানজাকশন আইডি লিখুন।');
+
+  const processSubmit = (screenshotUrl) => {
+    db.ref('drivers/' + currentDriverId).once('value', snap => {
+      const d = snap.val();
+      const reqId = 'payreq_' + Date.now();
+      db.ref('paymentRequests/' + reqId).set({
+        reqId, driverId: currentDriverId, driverName: d.name, driverPhone: d.phone,
+        txnId, screenshotUrl: screenshotUrl || '', dueAmount: d.txnDue || 0, status: 'Pending', timestamp: Date.now()
+      }).then(() => {
+        alert('আপনার ট্রানজাকশন আইডি ও স্ক্রিনশট ভেরিফিকেশনের জন্য অ্যাডমিনের কাছে পাঠানো হয়েছে।');
+        $('driverTxnIdInput').value = '';
+      });
+    });
+  };
+
+  if (fileInput) {
+    const reader = new FileReader();
+    reader.onload = e => processSubmit(e.target.result);
+    reader.readAsDataURL(fileInput);
+  } else {
+    processSubmit('');
+  }
+}
+
+function loadDriverEarningsAndStats(drvId) {
+  db.ref('rides').orderByChild('driverId').equalTo(drvId).once('value', snap => {
+    const rides = snap.val() || {};
+    let totalEarn = 0;
+    let completedCount = 0;
+    Object.values(rides).forEach(r => {
+      if (r.status === 'Completed') {
+        totalEarn += (r.fare || 0);
+        completedCount++;
+      }
+    });
+    $('drvTotalEarnings').textContent = '₹' + totalEarn;
+    $('drvCompletedCount').textContent = completedCount;
+  });
+}
+
+function toggleDriverOnlineState() {
+  if (!currentDriverId) return;
+  db.ref('drivers/' + currentDriverId).once('value', snap => {
+    const d = snap.val();
+    const now = Date.now();
+    const subActiveOnOff = currentCompanySettings.driverSubToggle !== 'off';
+    
+    if (subActiveOnOff && now > (d.subscriptionExpiry || 0)) {
+      return alert('আপনার সাবস্ক্রিপশন মেয়াদ শেষ! অনলাইন হতে হলে সাবস্ক্রিপশন রিনিউ করুন।');
+    }
+    if ((d.txnDue || 0) > 0) {
+      return alert('আপনার ট্রানজাকশন ডিউ বকেয়া আছে! কোম্পানিকে পেমেন্ট করে ভেরিফাই করানোর পর অনলাইন হতে পারবেন।');
+    }
+
+    db.ref('drivers/' + currentDriverId + '/online').transaction(v => !v).then(res => {
+      const on = res.snapshot.val();
+      $('drvOnlineStatusBadge').textContent = on ? 'Online' : 'Offline';
+      $('drvOnlineStatusBadge').className = `px-3 py-1 rounded-full text-xs font-black ${on ? 'bg-emerald-100 text-emerald-600 border border-emerald-300' : 'bg-red-100 text-red-600 border border-red-300'}`;
+      $('btnToggleDriverOnline').innerHTML = on ? '<i class="fa-solid fa-power-off"></i> Go Offline' : '<i class="fa-solid fa-power-off"></i> Go Online';
+
+      if (on) { startDriverGpsTracking(); }
+      else if (driverGpsInterval) clearInterval(driverGpsInterval);
+    });
+  });
+}
+
+function startDriverGpsTracking() {
+  const syncLoc = () => {
+    if (navigator.geolocation && currentDriverId) {
+      navigator.geolocation.getCurrentPosition(p => {
+        db.ref('drivers/' + currentDriverId + '/location').set({ lat: p.coords.latitude, lng: p.coords.longitude, updatedAt: Date.now() });
+      }, null, { enableHighAccuracy: true });
+    }
+  };
+  syncLoc();
+  if (driverGpsInterval) clearInterval(driverGpsInterval);
+  driverGpsInterval = setInterval(syncLoc, 2000);
+}
+
+function openDriverWhatsappGroup() {
+  window.open(currentCompanySettings.waGroupLink || 'https://chat.whatsapp.com/', '_blank');
+}
+
+function openFloatingSupportChat() {
+  const supNo = currentCompanySettings.whatsappNo || "9609546435";
+  window.open(`https://wa.me/91${supNo}?text=Hello%20Support`, '_blank');
+}
+
+function loadDriverIncomingRequests(drv) {
+  db.ref('rides').on('value', snap => {
+    const rides = snap.val() || {};
+    let html = '';
+    const maxRadiusKm = parseFloat(currentCompanySettings.driverRadiusKm) || 5;
+
+    Object.keys(rides).forEach(id => {
+      const r = rides[id];
+      const isParcelForAll = (r.category === 'Parcel');
+      const isMatchingCat = (r.category === drv.vehicleType);
+
+      if (r.status === 'Searching' && (isParcelForAll || isMatchingCat)) {
+        html += `<div class="bg-white p-3 rounded-2xl border border-blue-300 text-xs space-y-1.5 shadow">
+          <div class="flex justify-between font-black text-blue-900">
+            <span>${r.customerName} (${r.customerPhone})</span>
+            <span class="text-blue-600">₹${r.fare}</span>
+          </div>
+          <p class="text-blue-900 font-bold">Category: ${r.category} | Dist: ${r.distance}</p>
+          ${r.parcelDetails ? `<p class="text-amber-700 font-bold">📦 Parcel: ${r.parcelDetails.desc} — Size/Qty: (${r.parcelDetails.weight})</p>` : ''}
+          <button class="btn btn-green w-full text-xs py-2" onclick="acceptDriverRide('${r.id}')"><i class="fa-solid fa-check"></i> Accept Request (গ্রহণ করুন)</button>
+        </div>`;
+      }
+    });
+    $('driverRequestsContainer').innerHTML = html || '<p class="text-xs text-blue-900 font-bold">কাছাকাছি ৫ কিলোমিটারের মধ্যে কোনো বুকিং রিকোয়েস্ট নেই।</p>';
+  });
+}
+
+function acceptDriverRide(rideId) {
+  db.ref('drivers/' + currentDriverId).once('value', snap => {
+    const drv = snap.val();
+    db.ref('rides/' + rideId).update({
+      status: 'Accepted', driverId: currentDriverId, driverName: drv.name, driverPhone: drv.phone, driverVehicle: drv.vehicleNo
+    }).then(() => checkActiveDriverRide(currentDriverId));
+  });
+}
+
+function checkActiveDriverRide(drvId) {
+  db.ref('rides').on('value', snap => {
+    const rides = snap.val() || {};
+    const active = Object.values(rides).find(r => r.driverId === drvId && ['Accepted', 'Arrived', 'InProgress'].includes(r.status));
+
+    if (active) {
+      currentBookingId = active.id;
+      $('driverActiveRideCard').classList.remove('hidden');
+      $('drvRideStatusTag').textContent = active.status;
+      $('activeCustName').textContent = active.customerName;
+      $('activeCustCall').href = `tel:${active.customerPhone}`;
+      $('activeCustFare').textContent = '₹' + active.fare;
+      $('activeCustDist').textContent = active.distance;
+
+      if (active.parcelDetails) {
+        $('activeParcelInfo').classList.remove('hidden');
+        $('activeParcelDesc').textContent = active.parcelDetails.desc;
+        $('activeParcelWeight').textContent = active.parcelDetails.weight;
+        $('activeParcelRecv').textContent = active.parcelDetails.receiverName;
+        $('activeParcelRecvCall').href = `tel:${active.parcelDetails.receiverPhone}`;
+      } else {
+        $('activeParcelInfo').classList.add('hidden');
+      }
+
+      $('drvNavPickBtn').href = `https://www.google.com/maps/dir/?api=1&destination=${active.pickupLatLng[0]},${active.pickupLatLng[1]}`;
+      $('drvNavDropBtn').href = `https://www.google.com/maps/dir/?api=1&destination=${active.dropLatLng[0]},${active.dropLatLng[1]}`;
+
+      $('btnArrivedAtPickup').classList.toggle('hidden', active.status !== 'Accepted');
+      $('otpStartBox').classList.toggle('hidden', active.status !== 'Arrived');
+      $('btnCompleteRide').classList.toggle('hidden', active.status !== 'InProgress');
+    } else $('driverActiveRideCard').classList.add('hidden');
+  });
+}
+
+function markDriverArrived() {
+  if (currentBookingId) {
+    db.ref('rides/' + currentBookingId).update({ status: 'Arrived' });
+    speakAudioAlert('ڈرائیور کسٹمر کی لوکیشن پر پہنچ چکا ہے۔');
+  }
+}
+
+function verifyStartRideOtp() {
+  const otp = $('inputVerifyOtp').value.trim();
+  if (!currentBookingId) return;
+  db.ref('rides/' + currentBookingId).once('value', snap => {
+    const r = snap.val();
+    if (r && r.otp === otp) {
+      db.ref('rides/' + currentBookingId).update({ status: 'InProgress' });
+      speakAudioAlert('رائڈ شروع ہو چکی ہے۔');
+    } else alert('ভুল OTP দেওয়া হয়েছে!');
+  });
+}
+
+function completeDriverRide() {
+  if (currentBookingId) {
+    db.ref('rides/' + currentBookingId).update({ status: 'Completed' }).then(() => {
+      speakAudioAlert('یاترآ سمپورن ہو گئی ہے۔ ધന്യવાદ!');
+      alert('যাত্রা সফলভাবে সম্পূর্ণ হয়েছে!');
+      loadDriverEarningsAndStats(currentDriverId);
+    });
+  }
+}
+
+function driverCancelActiveRide() {
+  if (currentBookingId && confirm('আপনি কি নিশ্চিত এই রাইডটি বাতিল করতে চান?')) {
+    db.ref('rides/' + currentBookingId + '/status').set('Cancelled').then(() => {
+      alert('রাইড বাতিল করা হয়েছে।');
+      $('driverActiveRideCard').classList.add('hidden');
+    });
+  }
+}
+
+function logoutDriverAccount() {
+  if (currentDriverId) db.ref('drivers/' + currentDriverId + '/online').set(false);
+  localStorage.removeItem('inride_driver_id'); currentDriverId = null;
+  $('driverDashboard').classList.add('hidden');
+  $('driverLoginBox').classList.remove('hidden');
+}
+
+function shareDirectApplicationFile() {
+  const shareUrl = currentCompanySettings.shareAppLink || window.location.href;
+  const shareText = "🚖 পাবলিক ক্যাব - দ্রুত এবং নিরাপদ রাইড ও পার্সেল বুকিংয়ের জন্য ডাউনলোড ও ওপেন করুন:";
+  if (navigator.share) {
+    navigator.share({ title: "Public Cab Express", text: shareText, url: shareUrl });
+  } else {
+    navigator.clipboard.writeText(`${shareText} ${shareUrl}`);
+    alert("শেয়ার লিঙ্কটি ক্লিপবোর্ডে কপি করা হয়েছে!");
+  }
+}
+
+// Admin Panel Secret Tap (11 Taps)
+function handleLogoTap() {
+  logoTapCounter++;
+  if (logoTapCounter >= 11) {
+    logoTapCounter = 0;
+    $('adminModal').classList.remove('hidden');
+  }
+}
+function closeAdminModal() { $('adminModal').classList.add('hidden'); }
+
+function authenticateAdmin() {
+  if ($('adminPassInput').value.trim() === '78764825555') {
+    $('adminAuthBox').classList.add('hidden');
+    $('adminContentBox').classList.remove('hidden');
+    fetchAdminDashboardData();
+  } else alert('ভুল পাসকোড!');
+}
+
+function saveAdminGlobalSettings() {
+  const companyName = $('admCompanyName').value.trim();
+  const whatsappNo = $('admWhatsappNo').value.trim();
+  const waGroupLink = $('admWaGroupLink').value.trim();
+  const shareAppLink = $('admShareAppLink').value.trim();
+  const upiId = $('admCompanyUpi').value.trim();
+  const subPrice = $('admSubPrice').value.trim();
+  const driverSubToggle = $('admDriverSubToggle').value;
+  const storeSubToggle = $('admStoreSubToggle').value;
+
+  const logoFile = $('admLogoFile').files[0];
+  const bannerFile = $('admBannerFile').files[0];
+
+  const processSave = (logoUrl, bannerUrl) => {
+    const updateObj = { companyName, whatsappNo, waGroupLink, shareAppLink, upiId, subPrice, driverSubToggle, storeSubToggle };
+    if (logoUrl) updateObj.logoUrl = logoUrl;
+    if (bannerUrl) updateObj.bannerUrl = bannerUrl;
+
+    db.ref('settings').update(updateObj).then(() => {
+      alert('গ্লোবাল সেটিংস এবং লোগো/ব্যানার সফলভাবে সংরক্ষিত হয়েছে!');
+      location.reload();
+    });
+  };
+
+  if (logoFile || bannerFile) {
+    const readerLogo = new FileReader();
+    const readerBanner = new FileReader();
+
+    let logoResult = currentCompanySettings.logoUrl || "";
+    let bannerResult = currentCompanySettings.bannerUrl || "";
+
+    readerLogo.onload = e => {
+      logoResult = e.target.result;
+      if (!bannerFile || bannerResult) processSave(logoResult, bannerResult);
+    };
+    readerBanner.onload = e => {
+      bannerResult = e.target.result;
+      processSave(logoResult, bannerResult);
+    };
+
+    if (logoFile) readerLogo.readAsDataURL(logoFile);
+    if (bannerFile) readerBanner.readAsDataURL(bannerFile);
+  } else {
+    processSave(currentCompanySettings.logoUrl, currentCompanySettings.bannerUrl);
+  }
+}
+
+function saveAdminVehicleRates() {
+  const radiusKm = parseFloat($('admDriverRadiusKm').value) || 5;
+  db.ref('settings/driverRadiusKm').set(radiusKm);
+
+  const keys = Object.keys(vehicleRates);
+  keys.forEach(k => {
+    const baseInput = $(`adm_base_${k}`);
+    const perKmInput = $(`adm_perkm_${k}`);
+    if (baseInput && perKmInput) {
+      vehicleRates[k].base = parseFloat(baseInput.value) || vehicleRates[k].base;
+      vehicleRates[k].perKm = parseFloat(perKmInput.value) || vehicleRates[k].perKm;
+    }
+  });
+  db.ref('vehicleRates').set(vehicleRates).then(() => alert('রেট ও ড্রাইভার রেঞ্জ সফলভাবে আপডেট করা হয়েছে!'));
+}
+
+function fetchAdminDashboardData() {
+  db.ref('settings').on('value', snap => {
+    const s = snap.val() || {};
+    currentCompanySettings = s;
+    if (s.companyName) {
+      $('headerBrand').textContent = s.companyName;
+      $('docTitle').textContent = s.companyName;
+      $('admCompanyName').value = s.companyName;
+    }
+    if (s.logoUrl) {
+      $('headerLogo').src = s.logoUrl;
+      $('splashLogo').src = s.logoUrl;
+    }
+    if (s.bannerUrl) {
+      $('bannerContainer').innerHTML = `<div class="min-w-full px-2 py-1 text-center"><img src="${s.bannerUrl}" class="h-16 mx-auto object-contain rounded shadow"></div>`;
+    }
+    if (s.whatsappNo) $('admWhatsappNo').value = s.whatsappNo;
+    if (s.waGroupLink) $('admWaGroupLink').value = s.waGroupLink;
+    if (s.shareAppLink) $('admShareAppLink').value = s.shareAppLink;
+    if (s.upiId) $('admCompanyUpi').value = s.upiId;
+    if (s.subPrice) $('admSubPrice').value = s.subPrice;
+    if (s.driverSubToggle) $('admDriverSubToggle').value = s.driverSubToggle;
+    if (s.storeSubToggle) $('admStoreSubToggle').value = s.storeSubToggle;
+    if (s.driverRadiusKm) $('admDriverRadiusKm').value = s.driverRadiusKm;
+    setupDynamicManifest();
+  });
+
+  db.ref('vehicleRates').on('value', snap => {
+    const v = snap.val();
+    if (v) vehicleRates = v;
+    renderAdminRatesConfig();
+    renderCategoryGrid();
+  });
+
+  db.ref('stores').on('value', snap => {
+    const stores = snap.val() || {};
+    $('adminStoresApprovalList').innerHTML = Object.values(stores).map(st => `
+      <div class="bg-white p-2 rounded-xl text-xs space-y-1 border border-blue-200">
+        <b class="text-blue-900">${st.name} (${st.phone})</b>
+        <p>Status: <span class="text-emerald-600">${st.status}</span></p>
+        <div class="flex gap-1">
+          <button class="btn btn-green text-[10px] py-1 px-2" onclick="adminApproveStore('${st.id}')">Approve</button>
+          <button class="btn btn-red text-[10px] py-1 px-2" onclick="adminDeleteStore('${st.id}')">Delete</button>
+        </div>
+      </div>
+    `).join('') || '<p class="text-blue-900 font-bold">No store listings.</p>';
+  });
+
+  db.ref('paymentRequests').on('value', snap => {
+    const reqs = snap.val() || {};
+    $('adminDriverTxnVerifyList').innerHTML = Object.values(reqs).map(req => `
+      <div class="bg-white p-2.5 rounded-xl text-xs space-y-1 border border-blue-200">
+        <b class="text-blue-900">Driver: ${req.driverName} (${req.driverPhone})</b>
+        <p>Txn ID: <b class="text-blue-600">${req.txnId}</b> | Due: ₹${req.dueAmount}</p>
+        ${req.screenshotUrl ? `<a href="${req.screenshotUrl}" target="_blank" class="text-blue-600 underline block text-[11px]">View Screenshot</a>` : ''}
+        <button class="btn btn-green text-[10px] py-1 px-2 mt-1" onclick="adminVerifyAndClearDue('${req.reqId}', '${req.driverId}')">Verify & Clear Due</button>
+      </div>
+    `).join('') || '<p class="text-blue-900 font-bold">No pending payment verification requests.</p>';
+  });
+
+  db.ref('customers').on('value', snap => {
+    const custs = snap.val() || {};
+    $('adminCustomersList').innerHTML = Object.values(custs).map(c => `
+      <div class="bg-white p-2 rounded-xl text-xs flex justify-between items-center border border-blue-200">
+        <div>
+          <b class="text-blue-900">${c.name}</b> (${c.phone}) | Due: ₹${c.txnDue || 0}
+        </div>
+        <button class="btn btn-red text-[10px] py-1 px-2" onclick="adminDeleteCustomer('${c.id}')"><i class="fa-solid fa-trash"></i> Delete</button>
+      </div>
+    `).join('') || '<p class="text-blue-900 font-bold">No registered customers.</p>';
+  });
+
+  db.ref('drivers').on('value', snap => {
+    const drvs = snap.val() || {};
+    $('adminDriversList').innerHTML = Object.values(drvs).map(d => {
+      const activeSub = (d.subscriptionExpiry || 0) > Date.now();
+      return `
+        <div class="bg-white p-2.5 rounded-xl text-xs space-y-1.5 border border-blue-200">
+          <div class="flex justify-between items-center">
+            <b class="text-blue-900">${d.name} (${d.phone})</b>
+            <span class="px-2 py-0.5 rounded text-[10px] font-black ${d.status === 'Approved' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}">${d.status}</span>
+          </div>
+          <p class="text-blue-900 font-bold">Vehicle: ${d.vehicleType} · ${d.vehicleNo} | Due: ₹${d.txnDue || 0} | Sub: ${activeSub ? 'Active' : 'Expired'}</p>
+          <div class="flex gap-1 pt-1">
+            <button class="btn btn-green text-[10px] py-1 px-2" onclick="adminApproveDriver('${d.id}')">Approve</button>
+            <button class="btn btn-yellow text-[10px] py-1 px-2 text-blue-900 font-bold" onclick="adminExtendSubscription('${d.id}')">+1 Month Sub</button>
+            <button class="btn btn-red text-[10px] py-1 px-2" onclick="adminDeleteDriver('${d.id}')">Delete</button>
+          </div>
+        </div>`;
+    }).join('') || '<p class="text-blue-900 font-bold">No partner drivers registered.</p>';
+  });
+
+  db.ref('rides').on('value', snap => {
+    const rides = snap.val() || {};
+    $('adminLiveRidesList').innerHTML = Object.values(rides).map(r => `
+      <div class="bg-white p-2.5 rounded-xl text-xs space-y-1 border border-blue-200">
+        <div class="flex justify-between font-black text-blue-900">
+          <span>${r.category} · ₹${r.fare} (${r.distance})</span>
+          <span class="text-blue-600">${r.status}</span>
+        </div>
+        <p class="text-blue-900 font-bold">Cust: ${r.customerName} (${r.customerPhone}) | Driver: ${r.driverName || 'None'}</p>
+        <div class="flex gap-1 pt-1">
+          <button class="btn btn-red text-[10px] py-1 px-2" onclick="adminCancelOrDeleteRide('${r.id}')"><i class="fa-solid fa-trash"></i> Cancel/Delete</button>
+        </div>
+      </div>
+    `).join('') || '<p class="text-blue-900 font-bold">No active or past rides found.</p>';
+  });
+}
+
+function adminVerifyAndClearDue(reqId, drvId) {
+  db.ref('drivers/' + drvId).once('value', snap => {
+    const d = snap.val();
+    const currentExpiry = Math.max(d.subscriptionExpiry || Date.now(), Date.now());
+    const newExpiry = currentExpiry + (30 * 24 * 60 * 60 * 1000);
+
+    db.ref('drivers/' + drvId).update({ txnDue: 0, subscriptionExpiry: newExpiry }).then(() => {
+      db.ref('paymentRequests/' + reqId).remove().then(() => {
+        alert('পেমেন্ট সফলভাবে ভেরিফাই করা হয়েছে! ড্রাইভারের ডিউ জিরো করা হয়েছে এবং ১ মাসের সাবস্ক্রিপশন অ্যাক্টিভ করা হয়েছে।');
+      });
+    });
+  });
+}
+
+function adminApproveStore(storeId) {
+  db.ref('stores/' + storeId + '/status').set('Approved').then(() => alert('দোকান অ্যাপ্রুভ করা হয়েছে!'));
+}
+function adminDeleteStore(storeId) {
+  if (confirm('দোকানটি ডিলিট করতে চান?')) db.ref('stores/' + storeId).remove();
+}
+
+function renderAdminRatesConfig() {
+  const keys = Object.keys(vehicleRates);
+  $('adminRatesConfigList').innerHTML = keys.map(k => {
+    const r = vehicleRates[k];
+    return `<div class="grid grid-cols-3 gap-1 items-center bg-white p-2 rounded-xl border border-blue-200">
+      <b class="text-blue-900">${k}</b>
+      <input id="adm_base_${k}" class="field text-xs py-1" value="${r.base}" placeholder="Base (₹)">
+      <input id="adm_perkm_${k}" class="field text-xs py-1" value="${r.perKm}" placeholder="Per KM (₹)">
+    </div>`;
+  }).join('');
+}
+
+function adminApproveDriver(drvId) {
+  db.ref('drivers/' + drvId + '/status').set('Approved').then(() => alert('ড্রাইভার অ্যাপ্রুভ করা হয়েছে!'));
+}
+function adminExtendSubscription(drvId) {
+  db.ref('drivers/' + drvId).once('value', snap => {
+    const d = snap.val();
+    const currentExpiry = Math.max(d.subscriptionExpiry || Date.now(), Date.now());
+    const newExpiry = currentExpiry + (30 * 24 * 60 * 60 * 1000);
+    db.ref('drivers/' + drvId + '/subscriptionExpiry').set(newExpiry).then(() => alert('ড্রাইভারের সাবস্ক্রিপশন আরও ১ মাস বাড়িয়ে দেওয়া হয়েছে!'));
+  });
+}
+function adminDeleteDriver(drvId) {
+  if (confirm('নিশ্চিত এই ড্রাইভার ডিলিট করতে চান?')) db.ref('drivers/' + drvId).remove();
+}
+function adminDeleteCustomer(cId) {
+  if (confirm('নিশ্চিত এই কাস্টমার ডিলিট করতে চান?')) db.ref('customers/' + cId).remove();
+}
+function adminCancelOrDeleteRide(rId) {
+  if (confirm('নিশ্চিত এই রাইড রিমুভ/ক্যানসেল করতে চান?')) db.ref('rides/' + rId).remove();
+}
+
+window.addEventListener('load', () => {
+  renderCategoryGrid();
+  setTimeout(() => $('splash').classList.add('hidden'), 2500);
+  db.ref('settings').on('value', snap => {
+    currentCompanySettings = snap.val() || {};
+    setupDynamicManifest();
+  });
+  db.ref('vehicleRates').once('value', snap => {
+    if (snap.val()) vehicleRates = snap.val();
+    renderCategoryGrid();
+  });
+  if (currentCustomerId) verifyCustomerState();
+  if (currentDriverId) verifyDriverAccountState(currentDriverId);
+});
+</script>
+</body>
+</html>
